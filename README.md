@@ -96,6 +96,15 @@ this combined DBC in [webCAN](https://www.csselectronics.com/pages/webcan-can-bu
 and stream live from your CANsub to see your reverse-engineered signals decoded in
 real time - a final, live confirmation of the results.
 
+## Project extensions
+
+On top of the upstream reverse-engineering skills, this fork adds:
+
+- **`dbc/`** — finalized DBC files promoted from `decoding-output/`
+- **`ml/`** — maps CAN logs to the DBC and builds performance-analysis models
+  (`ml/data/`, `ml/models/`, `ml/notebooks/`)
+- **`firmware/display/`** — embedded firmware for a physical display of the results
+
 ## License and attribution
 
 These skills are fully open source under the [MIT License](LICENSE) - you are free to use, modify and distribute them in your own projects.

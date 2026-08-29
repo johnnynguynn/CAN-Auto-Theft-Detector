@@ -67,6 +67,13 @@ TEMP/
 ml/data/*
 !ml/data/.gitkeep
 
+# Driver classification platform: local SQLite db + per-session Parquet readings
+driver_platform/data/*
+!driver_platform/data/.gitkeep
+
+# Raw Car Scanner drive-log exports at repo root (personal GPS data — keep local only)
+/*.csv
+
 # Embedded/firmware build artifacts
 *.o
 *.obj

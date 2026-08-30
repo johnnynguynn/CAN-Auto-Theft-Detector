@@ -6,22 +6,12 @@ See CLAUDE.md for the file format and resampling rules this module implements.
 import numpy as np
 import pandas as pd
 
-# Exact PID strings -> (output column name, resample method).
-# method is "linear" (smooth continuous signals) or "hold" (step / discrete signals).
-# This dict is just a `signals` argument for to_wide() — it doesn't affect what
-# parse_log() stores. Every PID (including the throttle ones below) stays in the
-# raw long table regardless of what's included here.
 CORE_SIGNALS = {
     "Vehicle speed": {"column": "vehicle_speed_mph", "method": "linear"},
     "Engine RPM": {"column": "engine_rpm", "method": "linear"},
     "Vehicle acceleration": {"column": "vehicle_accel_g", "method": "linear"},
 }
 
-# Throttle candidates, left out of CORE_SIGNALS this session: "Absolute pedal
-# position E" logged only once (a single coincidental value), and "Throttle
-# position" / "Relative throttle position" are too sparse to trust. Revisit
-# once throttle is available via CAN. To bring one back:
-#   CORE_SIGNALS["Absolute pedal position E"] = THROTTLE_SIGNALS["Absolute pedal position E"]
 THROTTLE_SIGNALS = {
     "Absolute pedal position E": {"column": "throttle_pct_pedal_e", "method": "hold"},
     "Relative throttle position": {"column": "throttle_pct_relative", "method": "hold"},
@@ -31,10 +21,6 @@ THROTTLE_SIGNALS = {
 
 def parse_log(path):
     """Read a Car Scanner long-format CSV export into a tidy long DataFrame.
-
-    Handles the export's quirks: ';' delimiter, quoted fields, a trailing
-    empty column from the trailing ';' on every row, and the misspelled
-    LONGTITUDE header.
 
     Returns a DataFrame with columns: time, pid, value, units, lat, lon,
     sorted by time. Values are left as raw readings (no resampling).

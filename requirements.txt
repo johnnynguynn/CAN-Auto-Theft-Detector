@@ -30,3 +30,7 @@ requests>=2.30
 rapidocr>=2
 onnxruntime>=1.17
 opencv-python>=4.9
+
+# --- driver classification platform (driver_platform/): OBD-II log parsing,
+#     resampling, and per-session Parquet readings storage ---
+pyarrow>=17.0

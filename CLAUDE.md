@@ -19,19 +19,39 @@ reading a driver label for free, so that linkage is the backbone of the whole de
   10 Hz grid, per-signal interpolation method, and a per-signal `is_gap_<column>` flag
   for raw-sample gaps wider than `gap_threshold` (default 5s) — flagged, not NaN'd or
   dropped, so the interpolated values are still there to inspect.
-- Validated against the reference drive (`validate.py`): speed/RPM/accel look correct
-  (no negative speed, no flatlining). ~25% of the drive falls inside raw-sample gaps
-  that get bridged by a straight line — see the corrected throttle rates below, and
-  `is_gap_*` for how gaps are surfaced instead of hidden.
 - Throttle is parsed into raw storage like every other PID but **excluded from the
-  default `CORE_SIGNALS`/wide table** this session — see the corrected rates below.
-  `THROTTLE_SIGNALS` in `parser.py` holds all three candidates for a one-line re-add.
+  default `CORE_SIGNALS`/wide table** — see the corrected rates below. `THROTTLE_SIGNALS`
+  in `parser.py` holds all three candidates for a one-line re-add.
 - SQLite data model (`db.py`, `schema.sql`): `drivers` and `sessions` tables, linked by
-  `driver_id`; `sessions.parquet_path` is reserved for the Parquet store below.
+  `driver_id`. No `parquet_path` column — a session's data always lives at
+  `sessions/<session_id>/raw.parquet` by convention (`readings_store.session_dir()`),
+  so the id alone is enough to find it; there's no separate path to keep in sync.
+- Parquet readings storage (`readings_store.py`): `write_session_readings()` /
+  `load_session_readings()` store/load the raw long DataFrame at that convention path.
+  `write_session_readings()` refuses to overwrite an existing `raw.parquet` unless
+  `overwrite=True` — readings are meant to be written once and treated as immutable.
+- Full ingest pipeline (`session_ingest.py`): `ingest_csv(conn, csv_path, driver_name,
+  started_at, ...)` does CSV → raw DataFrame → driver row (looked up or created) →
+  session row → Parquet file, all using the session_id SQLite actually assigned (never
+  a separately generated one). Rolls back the session (and driver, if newly created)
+  row if the Parquet write fails, so a failed ingest can't leave an orphaned DB row.
+- Real data ingested via the pipeline: 2 drivers (Johnny, Andy), 3 sessions total, in
+  the local `driver_platform/data/` (gitignored — not committed).
 
-**Not built yet:** Parquet per-session readings storage (next — it's what
-`sessions.parquet_path` is waiting for), the `Replayer` acquisition interface, UI, ML
-model.
+**Bugs found and fixed while testing the ingest pipeline** (see `db.py`/`session_ingest.py`):
+1. Duplicate-CSV detection compared raw path strings, so the same file ingested via a
+   relative vs. absolute path created two sessions. Fixed by resolving `csv_path` to a
+   canonical absolute path before checking/storing.
+2. A failed Parquet write left orphaned driver/session rows in SQLite (both had already
+   committed before the write was attempted). Fixed: `ingest_csv` now rolls back on
+   write failure.
+3. Driver lookup was exact-string, so `"Johnny"` / `"johnny"` / `" Johnny"` each forked
+   a separate driver profile. Fixed with case/whitespace-insensitive matching.
+4. Fix #1 only covered *new* inserts — a session ingested before that fix still had a
+   non-canonical stored path and could still be duplicated. Fixed with a one-time
+   backfill, `normalize_session_csv_paths()`, run once against the real db.
+
+**Not built yet:** the `Replayer` acquisition interface, UI, ML model/export.
 
 ## The data file
 
@@ -114,9 +134,11 @@ smooth, plausible acceleration curve that was never actually recorded.
   one-line change. Build the parser/replayer with this seam in mind.
 - **Storage / data model:**
   - `SQLite` for driver profiles and session metadata (small, relational).
-  - `Parquet` per session for readings (bulk time-series). Store raw long readings;
-    generate the resampled wide table on export.
-  - Link everything by **session_id**; each session carries a **driver_id** (the label).
+  - `Parquet` per session for readings (bulk time-series), one file at
+    `sessions/<session_id>/raw.parquet`. Store raw long readings; generate the
+    resampled wide table on export.
+  - Link everything by **session_id**; each session carries a **driver_id** (the
+    label). The Parquet path is never stored — always derived from session_id.
 - **ML export** (later): "these drivers, these signals, resampled to a fixed grid" →
   Parquet/CSV. The 10 Hz wide-table code built now IS the heart of this export.
 

@@ -1,20 +1,22 @@
--- SQLite schema for driver profiles and session metadata.
--- Bulk readings are NOT stored here — they live in per-session Parquet files,
--- linked via sessions.parquet_path. See CLAUDE.md's Storage / data model section.
+-- SQL queries to create tables 
 
+
+-- Drivers table
 CREATE TABLE IF NOT EXISTS drivers (
     driver_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+-- Sessions table
+-- Each entry is linked to a parquet file that stores raw 
+-- information about that session drive.
 CREATE TABLE IF NOT EXISTS sessions (
     session_id    INTEGER PRIMARY KEY AUTOINCREMENT,
     driver_id     INTEGER NOT NULL REFERENCES drivers(driver_id),
     started_at    TEXT NOT NULL,
     ended_at      TEXT,
     source_csv    TEXT,
-    parquet_path  TEXT,
     notes         TEXT,
     created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
